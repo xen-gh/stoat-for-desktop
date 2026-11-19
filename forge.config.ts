@@ -129,39 +129,21 @@ const config: ForgeConfig = {
       const { execSync } = require("child_process");
 
       if (platform === "win32") {
-        console.log(
-          "[prePackage] Building for Windows, compiling keyspy WinKeyServer...",
-        );
-
-        const winServerSrc = path.join(
-          keyspyPath,
-          "native",
-          "WinKeyServer",
-          "main.cpp",
-        );
         const buildDir = path.join(keyspyPath, "build");
         const winServerBin = path.join(buildDir, "WinKeyServer.exe");
+        const runtimeBin = path.join(keyspyPath, "runtime", "WinKeyServer.exe");
 
         fs.mkdirSync(buildDir, { recursive: true });
 
-        try {
-          // On Windows, compile natively. On Linux cross-compiling to Windows, use mingw.
-          if (process.platform === "win32") {
-            execSync(`c++ "${winServerSrc}" -o "${winServerBin}" -static`, {
-              stdio: "inherit",
-            });
-          } else {
-            execSync(
-              `x86_64-w64-mingw32-g++ -static -static-libgcc -static-libstdc++ -o "${winServerBin}" "${winServerSrc}" -luser32 -lkernel32`,
-              { stdio: "inherit" },
-            );
-          }
-          console.log("[prePackage] WinKeyServer.exe compiled successfully");
-        } catch (err) {
-          console.warn(
-            "[prePackage] Failed to compile WinKeyServer, Windows PTT may not work",
+        if (fs.existsSync(runtimeBin)) {
+          fs.copyFileSync(runtimeBin, winServerBin);
+          console.log(`[prePackage] Reused WinKeyServer.exe from ${runtimeBin}`);
+        } else if (fs.existsSync(winServerBin)) {
+          console.log(`[prePackage] Reusing existing ${winServerBin}`);
+        } else {
+          throw new Error(
+            `WinKeyServer.exe not found: checked ${runtimeBin} and ${winServerBin}`,
           );
-          console.warn("[prePackage] Error:", err);
         }
       } else if (platform === "linux") {
         console.log(

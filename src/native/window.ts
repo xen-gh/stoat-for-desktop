@@ -41,50 +41,118 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 export function initBuildUrl() {
-  const forceServer = app.commandLine.getSwitchValue("force-server");
+  const args = process.argv;
+
+  let forceServer: string | undefined;
+
+  // Support:
+  //   --force-server=https://example.com
+  //   --force-server https://example.com
+  const forceServerArg = args.find((arg) =>
+    arg.startsWith("--force-server="),
+  );
+
+  if (forceServerArg) {
+    forceServer = forceServerArg.slice("--force-server=".length);
+  } else {
+    const forceServerIndex = args.indexOf("--force-server");
+
+    if (
+      forceServerIndex !== -1 &&
+      args[forceServerIndex + 1] &&
+      !args[forceServerIndex + 1].startsWith("--")
+    ) {
+      forceServer = args[forceServerIndex + 1];
+    }
+  }
+
+  console.log("[Window] process.argv:", process.argv);
+  console.log("[Window] force-server:", forceServer ?? "(not set)");
 
   // Try to find local web assets in multiple locations
   const fs = require("fs");
   const path = require("path");
 
-  // Possible locations for web-dist
   const possiblePaths = [
-    // In resources directory (packaged app)
     path.join(process.resourcesPath, "web-dist"),
-    // Relative to app path (development)
     path.join(app.getAppPath(), "..", "web-dist"),
-    // Next to the executable
     path.join(path.dirname(process.execPath), "web-dist"),
   ];
 
   for (const testPath of possiblePaths) {
     const indexPath = path.join(testPath, "index.html");
+
     if (fs.existsSync(indexPath)) {
       localWebDir = testPath;
-      console.log("[Window] Found local web assets at:", testPath);
+
+      console.log(
+        "[Window] Found local web assets at:",
+        testPath,
+      );
+
       break;
     }
   }
 
-  if (!forceServer && localWebDir) {
-    // Setup protocol handler for local files
+  if (forceServer) {
+    try {
+      const serverUrl = new URL(forceServer);
+
+      if (serverUrl.protocol !== "http:" && serverUrl.protocol !== "https:") {
+        throw new Error(
+          `Unsupported protocol: ${serverUrl.protocol}`,
+        );
+      }
+
+      BUILD_URL = serverUrl;
+
+      console.log(
+        "[Window] Loading from forced server:",
+        BUILD_URL.toString(),
+      );
+    } catch (error) {
+      console.error(
+        "[Window] Invalid --force-server URL:",
+        forceServer,
+        error,
+      );
+
+      // Fall back to normal behavior
+      if (localWebDir) {
+        setupLocalProtocol();
+        BUILD_URL = new URL("stoat://-/index.html");
+
+        console.log(
+          "[Window] Falling back to local web assets:",
+          localWebDir,
+        );
+      } else {
+        BUILD_URL = new URL("https://stoat.chat/app");
+
+        console.log(
+          "[Window] Falling back to Stoat:",
+          BUILD_URL.toString(),
+        );
+      }
+    }
+  } else if (localWebDir) {
     setupLocalProtocol();
+
     BUILD_URL = new URL("stoat://-/index.html");
+
     console.log(
       "[Window] Loading from local web assets via custom protocol:",
       localWebDir,
     );
   } else {
-    BUILD_URL = new URL(
-      forceServer ||
-        /*MAIN_WINDOW_VITE_DEV_SERVER_URL ??*/ "https://stoat.chat/app",
+    BUILD_URL = new URL("https://stoat.chat/app");
+
+    console.log(
+      "[Window] Loading from remote URL:",
+      BUILD_URL.toString(),
     );
-    console.log("[Window] Loading from remote URL:", BUILD_URL.toString());
-    if (forceServer) {
-      console.log("[Window] (forced server via --force-server flag)");
-    } else if (!localWebDir) {
-      console.log("[Window] (local web assets not found)");
-    }
+
+    console.log("[Window] Local web assets not found");
   }
 }
 
@@ -169,6 +237,56 @@ export function createMainWindow() {
       // Keep it enabled for production (remote URLs)
       webSecurity: BUILD_URL.protocol === "https:",
     },
+  });
+
+  mainWindow.webContents.on("did-start-loading", () => {
+    console.log("[Window] did-start-loading");
+  });
+
+  mainWindow.webContents.on("did-stop-loading", () => {
+    console.log("[Window] did-stop-loading");
+  });
+
+  mainWindow.webContents.on("did-finish-load", () => {
+    console.log("[Window] did-finish-load:", mainWindow.webContents.getURL());
+  });
+
+  mainWindow.webContents.on(
+    "did-fail-load",
+    (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+      console.error("[Window] did-fail-load:", {
+        errorCode,
+        errorDescription,
+        validatedURL,
+        isMainFrame,
+      });
+    },
+  );
+
+  mainWindow.webContents.on("render-process-gone", (_event, details) => {
+    console.error("[Window] render-process-gone:", details);
+  });
+
+  mainWindow.webContents.on("console-message", (event) => {
+    console.log("[Renderer]", {
+      level: event.level,
+      message: event.message,
+      sourceId: event.sourceId,
+      lineNumber: event.lineNumber,
+    });
+  });
+
+
+  mainWindow.webContents.on("preload-error", (_event, preloadPath, error) => {
+    console.error("[Window] preload-error:", preloadPath, error);
+  });
+
+  mainWindow.webContents.on("unresponsive", () => {
+    console.error("[Window] Renderer became unresponsive");
+  });
+
+  mainWindow.webContents.on("responsive", () => {
+    console.log("[Window] Renderer responsive");
   });
 
   // hide the options
@@ -334,12 +452,12 @@ export function createMainWindow() {
           if (sources.length == 1) {
             request.audioRequested
               ? callback({
-                  video: sources[0],
-                  audio: "loopback",
-                })
+                video: sources[0],
+                audio: "loopback",
+              })
               : callback({
-                  video: sources[0],
-                });
+                video: sources[0],
+              });
             return;
           }
           ipcMain.once(
@@ -350,12 +468,12 @@ export function createMainWindow() {
               } else {
                 audio
                   ? callback({
-                      video: sources[idx],
-                      audio: "loopback",
-                    })
+                    video: sources[idx],
+                    audio: "loopback",
+                  })
                   : callback({
-                      video: sources[idx],
-                    });
+                    video: sources[idx],
+                  });
               }
             },
           );

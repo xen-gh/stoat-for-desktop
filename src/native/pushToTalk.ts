@@ -321,6 +321,10 @@ function keyspyKeyToAccelerator(keyspyName: string): string {
     equal: "=",
     equals: "=",
     space: " ",
+    "CAPS LOCK": "capslock",
+    "caps lock": "capslock",
+    caps_lock: "capslock",
+    capslock: "capslock",
 
     // Windows keyspy standardName values (have spaces)
     "square bracket open": "[",
@@ -371,14 +375,14 @@ function handleBeforeInputEvent(event: Electron.Event, input: Electron.Input) {
   const matchingKeybind =
     input.type === "keyUp"
       ? currentKeybinds.find(
-          (keybind) => keybind.id === heldPttBindingsByKey.get(keyStateId),
-        )
+        (keybind) => keybind.id === heldPttBindingsByKey.get(keyStateId),
+      )
       : findMatchingKeybind(input);
   const focused = mainWindow?.isFocused() ?? false;
 
   pttLog(
     `Input event: type=${input.type}, key=${input.key}, code=${input.code}, ` +
-      `isPttKey=${Boolean(matchingKeybind)}, pttActive=${isPttActive}, focused=${focused}`,
+    `isPttKey=${Boolean(matchingKeybind)}, pttActive=${isPttActive}, focused=${focused}`,
   );
 
   if (!matchingKeybind) {
@@ -403,7 +407,7 @@ function handleBeforeInputEvent(event: Electron.Event, input: Electron.Input) {
       heldPttBindingsByKey.set(keyStateId, matchingKeybind.id);
       activatePtt(
         "before-input-event keyDown" +
-          (focused ? " (focused)" : " (unfocused)"),
+        (focused ? " (focused)" : " (unfocused)"),
       );
     } else if (input.type === "keyUp") {
       heldKeys.delete(keyIdentifier);
@@ -413,7 +417,7 @@ function handleBeforeInputEvent(event: Electron.Event, input: Electron.Input) {
       if (heldPttBindings.size === 0) {
         deactivatePtt(
           "before-input-event keyUp" +
-            (focused ? " (focused)" : " (unfocused)"),
+          (focused ? " (focused)" : " (unfocused)"),
         );
       }
     }
@@ -517,13 +521,13 @@ async function startKeyspy(): Promise<void> {
       const matchingKeybind =
         event.state === "UP"
           ? currentKeybinds.find(
-              (keybind) => keybind.id === heldPttBindingsByKey.get(keyStateId),
-            )
+            (keybind) => keybind.id === heldPttBindingsByKey.get(keyStateId),
+          )
           : findMatchingKeyspyBinding(event, isDown);
 
       pttLog(
         `Keyspy event: name=${event.name}, mapped=${mappedKey}, state=${event.state}, ` +
-          `isPttKey=${Boolean(matchingKeybind)}, pttActive=${isPttActive}`,
+        `isPttKey=${Boolean(matchingKeybind)}, pttActive=${isPttActive}`,
       );
 
       if (!matchingKeybind) {

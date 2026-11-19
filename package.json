@@ -5,7 +5,7 @@
   "main": ".vite/build/main.js",
   "repository": "stoatchat/desktop",
   "scripts": {
-    "start": "electron-forge start -- --no-sandbox",
+    "start": "electron-forge start -- --no-sandbox --enable-features=UseOzonePlatform --ozone-platform=wayland",
     "start:x11": "electron-forge start -- --no-sandbox --ozone-platform=x11",
     "package": "electron-forge package",
     "make": "electron-forge make",

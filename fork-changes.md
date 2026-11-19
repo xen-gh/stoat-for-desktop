@@ -124,7 +124,7 @@ Neither Electron's `globalShortcut` nor `iohook` worked reliably, so the fork ev
 // create window and application contexts
 createMainWindow();
 initTray();
-initDiscordRpc();
+//initDiscordRpc();
 initPushToTalk(); // <-- fork
 ```
 
